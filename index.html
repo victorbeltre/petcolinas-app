@@ -2476,7 +2476,7 @@ Mascota: ${f.mascota}
           );
           return c?.telefono || "";
         })(),
-        items: g.items.map((v) => ({ descripcion: v.servicio || v.area || "", cantidad: 1, precio: v.total || 0 })),
+        items: g.items.flatMap((v) => v.items && v.items.length > 0 ? v.items.map((it) => ({ descripcion: it.nombre || "", cantidad: 1, precio: it.subtotal || it.precio || 0 })) : [{ descripcion: v.servicio || v.descripcion || v.area || "", cantidad: 1, precio: v.total || 0 }]),
         itbis: false,
         subtotal,
         itbisAmt: 0,
