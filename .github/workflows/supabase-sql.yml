@@ -1,0 +1,33 @@
+name: supabase-sql
+# Puente para ejecutar SQL en Supabase desde Claude Code.
+# El token vive en el secret SUPABASE_ACCESS_TOKEN — nunca en el código.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql:
+        description: "SQL a ejecutar en el proyecto Supabase"
+        required: true
+        type: string
+
+jobs:
+  run-sql:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ejecutar SQL via Management API
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SQL: ${{ github.event.inputs.sql }}
+        run: |
+          RESPONSE=$(jq -n --arg q "$SQL" '{query: $q}' | curl -s -w "\nHTTP_STATUS:%{http_code}" \
+            -X POST "https://api.supabase.com/v1/projects/ulrzzddovkioxeaarnjk/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data @-)
+          echo "=== RESULTADO SQL ==="
+          echo "$RESPONSE"
+          STATUS=$(echo "$RESPONSE" | grep -o 'HTTP_STATUS:[0-9]*' | cut -d: -f2)
+          if [ "$STATUS" -ge 400 ]; then
+            echo "::error::La consulta SQL falló con HTTP $STATUS"
+            exit 1
+          fi
