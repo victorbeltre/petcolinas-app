@@ -1,0 +1,41 @@
+name: supabase-sql-tofile
+# Igual que supabase-sql pero guarda el resultado JSON en sql-results/latest.json
+# para poder leerlo sin depender de los logs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql:
+        description: "SQL a ejecutar en el proyecto Supabase"
+        required: true
+        type: string
+
+jobs:
+  run-sql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ejecutar SQL y guardar resultado
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SQL: ${{ github.event.inputs.sql }}
+        run: |
+          STATUS=$(jq -n --arg q "$SQL" '{query: $q}' | curl -s -w "%{http_code}" -o /tmp/result.json \
+            -X POST "https://api.supabase.com/v1/projects/ulrzzddovkioxeaarnjk/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data @-)
+          echo "HTTP_STATUS:$STATUS"
+          mkdir -p sql-results
+          cp /tmp/result.json sql-results/latest.json
+          git config user.name "sql-bot"
+          git config user.email "sql-bot@users.noreply.github.com"
+          git add sql-results/latest.json
+          git commit -m "sql result $(date -u +%Y%m%dT%H%M%S)" || echo "sin cambios"
+          git push
+          if [ "$STATUS" -ge 400 ]; then
+            echo "::error::La consulta SQL falló con HTTP $STATUS"
+            exit 1
+          fi
