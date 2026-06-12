@@ -1,0 +1,29 @@
+name: fetch-url
+# Puente para descargar contenido de URLs publicas (p.ej. export CSV de Google Sheets)
+# desde el runner de Actions, que si tiene acceso a internet.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL a descargar"
+        required: true
+        type: string
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar URL
+        env:
+          URL: ${{ github.event.inputs.url }}
+        run: |
+          STATUS=$(curl -sL -w "%{http_code}" -o /tmp/out.txt "$URL")
+          echo "HTTP_STATUS:$STATUS"
+          echo "=== CONTENIDO ==="
+          base64 -w 120 /tmp/out.txt
+          echo "=== FIN CONTENIDO ==="
+          if [ "$STATUS" -ge 400 ]; then
+            echo "::error::Descarga fallo con HTTP $STATUS"
+            exit 1
+          fi
