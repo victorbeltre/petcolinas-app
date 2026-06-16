@@ -1,0 +1,39 @@
+name: vapi-call-status
+# Diagnóstico: consulta las últimas llamadas en Vapi y muestra por qué terminaron.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar últimas llamadas en Vapi
+        env:
+          VAPI_API_KEY: ${{ secrets.VAPI_API_KEY }}
+        run: |
+          echo "=== Últimas 5 llamadas en Vapi ==="
+          curl -s "https://api.vapi.ai/call?limit=5" \
+            -H "Authorization: Bearer $VAPI_API_KEY" \
+          | python3 -c "
+          import sys, json
+          calls = json.load(sys.stdin)
+          if not isinstance(calls, list):
+              print('Respuesta inesperada:', json.dumps(calls)[:500]); sys.exit(0)
+          for c in calls:
+              print('---')
+              print('id           :', c.get('id'))
+              print('createdAt    :', c.get('createdAt'))
+              print('status       :', c.get('status'))
+              print('endedReason  :', c.get('endedReason'))
+              cust = c.get('customer') or {}
+              print('destino      :', cust.get('number'))
+              print('phoneNumberId:', c.get('phoneNumberId'))
+              print('cost         :', c.get('cost'))
+              # Mensajes de error del proveedor (Twilio) si existen
+              pcd = c.get('phoneCallProviderDetails') or {}
+              if pcd: print('providerDetails:', json.dumps(pcd)[:400])
+              msgs = c.get('messages') or []
+              if msgs:
+                  print('primerMensaje:', json.dumps(msgs[0])[:200])
+          "
