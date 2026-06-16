@@ -1,0 +1,53 @@
+name: deploy-functions
+# Despliega las Edge Functions de Vapi a Supabase desde GitHub (sin trabajo local).
+# Requiere los secrets del repo: SUPABASE_ACCESS_TOKEN, VAPI_API_KEY,
+# VAPI_ASSISTANT_ID, VAPI_PHONE_NUMBER_ID.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama que contiene supabase/functions (default: rama de desarrollo)"
+        required: false
+        default: "claude/resume-petcolinas-dev-XirXq"
+        type: string
+
+env:
+  PROJECT_REF: ulrzzddovkioxeaarnjk
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código con las funciones
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Instalar Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Guardar secrets de Vapi en Supabase
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase secrets set \
+            VAPI_API_KEY="${{ secrets.VAPI_API_KEY }}" \
+            VAPI_ASSISTANT_ID="${{ secrets.VAPI_ASSISTANT_ID }}" \
+            VAPI_PHONE_NUMBER_ID="${{ secrets.VAPI_PHONE_NUMBER_ID }}" \
+            --project-ref "$PROJECT_REF"
+
+      - name: Desplegar Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          for fn in vapi-tools vapi-webhook vapi-trigger; do
+            echo "=== Desplegando $fn ==="
+            supabase functions deploy "$fn" \
+              --project-ref "$PROJECT_REF" \
+              --no-verify-jwt
+          done
+          echo "=== Funciones desplegadas ==="
+          supabase functions list --project-ref "$PROJECT_REF"
