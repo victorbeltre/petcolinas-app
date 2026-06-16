@@ -1,0 +1,31 @@
+name: vapi-phone-info
+# Diagnóstico: muestra la configuración del número de teléfono en Vapi.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  info:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar configuración del número
+        env:
+          VAPI_API_KEY: ${{ secrets.VAPI_API_KEY }}
+        run: |
+          echo "=== Números de teléfono en Vapi ==="
+          curl -s "https://api.vapi.ai/phone-number" \
+            -H "Authorization: Bearer $VAPI_API_KEY" \
+          | python3 -c "
+          import sys, json
+          nums = json.load(sys.stdin)
+          if not isinstance(nums, list):
+              print('Respuesta:', json.dumps(nums)[:600]); sys.exit(0)
+          for n in nums:
+              print('---')
+              for k in ['id','number','provider','status','twilioAccountSid','credentialId','name','fallbackDestination']:
+                  if k in n: print(f'{k:18}:', n.get(k))
+              # Mostrar cualquier campo de error/estado
+              for k,v in n.items():
+                  if 'error' in k.lower() or 'status' in k.lower():
+                      print(f'{k:18}:', v)
+          "
