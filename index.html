@@ -3225,9 +3225,9 @@ function PetColinasApp({ session, onLogout }) {
   useEffect(() => {
     const fetchCitas = async () => {
       try {
-        const rows = await supaFetch("pc_citas", "GET", null, "?order=id.desc&limit=20");
+        const rows = await supaFetch("pc_seguimientos", "GET", null, "?tipo=eq.cita_sofia&order=id.desc&limit=20");
         if (Array.isArray(rows) && rows.length > 0) {
-          const normalized = rows.map(r => ({ id: r.id, fecha: r.fecha, hora: r.hora, mascota: r.mascota, propietario: r.propietario, telefono: r.telefono, servicio: r.servicio, notas: r.notas, estado: r.estado, agendadaPor: r.agendada_por, createdAt: r.created_at }));
+          const normalized = rows.map(r => ({ id: r.id, fecha: r.proxima_fecha || r.proximafecha, hora: (r.notas||"").includes("—") ? (r.notas||"").split("—")[1]?.trim() : "", mascota: r.mascota, propietario: r.propietario, telefono: r.telefono, servicio: (r.notas||"").split("—")[0]?.trim() || "Cita", notas: r.notas, estado: r.completado ? "completada" : "pendiente", agendadaPor: "sofia" }));
           if (normalized.length > lastCitasCount.current && lastCitasCount.current > 0) {
             setNewCitaAlert(normalized[0]);
           }

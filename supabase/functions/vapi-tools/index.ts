@@ -155,25 +155,26 @@ async function handleAgendarCita(
     ? `${motivo} — ${hora}`
     : motivo;
 
-  // Guardar en pc_citas para visualizacion en Dashboard
+  // Guardar en pc_seguimientos con tipo "cita_sofia" para visualización en Dashboard
   const callCustomer = (msg.call as Record<string, unknown>)?.customer as Record<string, unknown> ?? {};
   const telefono = String(callCustomer.number ?? args.telefono ?? "").replace(/\D/g, "").slice(-10);
   const servicio = String(args.servicio ?? motivo);
+  const notasCita = `${servicio}${hora ? " — " + hora : ""}`;
 
-  const { error: errorCita } = await supabase.from("pc_citas").insert({
-    fecha: fechaISO,
-    hora: hora || null,
+  const { error: errorSeg } = await supabase.from("pc_seguimientos").insert({
     mascota: nombreMascota,
     propietario: nombrePropietario || null,
     telefono: telefono || null,
-    servicio,
-    notas: motivo !== servicio ? motivo : null,
-    estado: "pendiente",
-    agendada_por: "sofia",
+    tipo: "cita_sofia",
+    proxima_fecha: fechaISO,
+    ultima_fecha: new Date().toISOString().slice(0, 10),
+    notas: notasCita,
+    activo: true,
+    completado: false,
   });
 
-  if (errorCita) {
-    console.error("Error guardando en pc_citas:", errorCita);
+  if (errorSeg) {
+    console.error("Error guardando cita en pc_seguimientos:", errorSeg);
     return "Hubo un problema al guardar la cita. Por favor registrarla manualmente.";
   }
 
