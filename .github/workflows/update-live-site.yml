@@ -1,0 +1,55 @@
+name: update-live-site
+# Copia index.html del branch de desarrollo al repo live victorbeltre/petcolinas.
+# Requiere el secret LIVE_REPO_TOKEN: un PAT con permisos repo/write sobre victorbeltre/petcolinas.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch fuente (default: dev branch)"
+        required: false
+        default: "claude/resume-petcolinas-dev-XirXq"
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch de desarrollo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Obtener SHA actual del index.html en live
+        id: sha
+        env:
+          TOKEN: ${{ secrets.LIVE_REPO_TOKEN }}
+        run: |
+          SHA=$(curl -s \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://api.github.com/repos/victorbeltre/petcolinas/contents/index.html" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['sha'])")
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "SHA actual: $SHA"
+
+      - name: Push index.html al repo live
+        env:
+          TOKEN: ${{ secrets.LIVE_REPO_TOKEN }}
+        run: |
+          CONTENT=$(base64 -w 0 index.html)
+          RESPONSE=$(curl -s -w "\nHTTP:%{http_code}" \
+            -X PUT "https://api.github.com/repos/victorbeltre/petcolinas/contents/index.html" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"message\": \"deploy: actualizar app desde petcolinas-app dev branch\",
+              \"content\": \"$CONTENT\",
+              \"sha\": \"${{ steps.sha.outputs.sha }}\"
+            }")
+          HTTP=$(echo "$RESPONSE" | grep "HTTP:" | cut -d: -f2)
+          echo "Status: $HTTP"
+          if [ "$HTTP" -ge 400 ]; then
+            echo "::error::Push fallido con HTTP $HTTP"
+            exit 1
+          fi
+          echo "=== Deploy exitoso ==="
