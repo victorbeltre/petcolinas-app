@@ -35,20 +35,36 @@ jobs:
       - name: Push index.html al repo live
         env:
           TOKEN: ${{ secrets.LIVE_REPO_TOKEN }}
+          FILE_SHA: ${{ steps.sha.outputs.sha }}
         run: |
-          CONTENT=$(base64 -w 0 index.html)
+          # Construir payload JSON en archivo para evitar limite de args del shell
+          python3 - <<'PYEOF'
+import base64, json, subprocess, sys, os
+
+with open("index.html", "rb") as f:
+    content = base64.b64encode(f.read()).decode()
+
+payload = {
+    "message": "deploy: actualizar app desde petcolinas-app dev branch",
+    "content": content,
+    "sha": os.environ["FILE_SHA"]
+}
+
+with open("/tmp/payload.json", "w") as f:
+    json.dump(payload, f)
+
+print(f"Payload escrito: {len(content)} chars base64")
+PYEOF
+
           RESPONSE=$(curl -s -w "\nHTTP:%{http_code}" \
             -X PUT "https://api.github.com/repos/victorbeltre/petcolinas/contents/index.html" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"message\": \"deploy: actualizar app desde petcolinas-app dev branch\",
-              \"content\": \"$CONTENT\",
-              \"sha\": \"${{ steps.sha.outputs.sha }}\"
-            }")
+            --data @/tmp/payload.json)
           HTTP=$(echo "$RESPONSE" | grep "HTTP:" | cut -d: -f2)
           echo "Status: $HTTP"
           if [ "$HTTP" -ge 400 ]; then
+            echo "Error response: $(echo "$RESPONSE" | head -c 500)"
             echo "::error::Push fallido con HTTP $HTTP"
             exit 1
           fi
