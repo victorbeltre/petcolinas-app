@@ -1,127 +1,181 @@
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+/**
+ * vapi-tools — Edge Function que maneja las tool calls de Vapi durante una llamada activa.
+ *
+ * Vapi llama a este endpoint cuando el modelo (Claude) quiere usar una herramienta:
+ *   - obtenerInfoCliente  →  devuelve historial del cliente/mascota desde Supabase
+ *   - agendarCita         →  crea un seguimiento en pc_seguimientos
+ */
 
-const SUPA_URL = Deno.env.get('SUPABASE_URL') ?? 'https://ulrzzddovkioxeaarnjk.supabase.co'
-const SUPA_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-async function dbInsert(table: string, row: Record<string, unknown>) {
-  const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPA_KEY,
-      'Authorization': `Bearer ${SUPA_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
-    },
-    body: JSON.stringify(row),
-  })
-  return res.ok
-}
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-async function dbQuery(table: string, params: string) {
-  const res = await fetch(`${SUPA_URL}/rest/v1/${table}${params}`, {
-    headers: {
-      'apikey': SUPA_KEY,
-      'Authorization': `Bearer ${SUPA_KEY}`,
-    },
-  })
-  if (!res.ok) return null
-  return res.json()
-}
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, content-type",
+};
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: cors });
   }
 
+  let body: Record<string, unknown>;
   try {
-    const body = await req.json()
-    const message = body.message ?? body
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Bad JSON" }), {
+      status: 400,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
 
-    const toolCallList = message.toolCallList ?? message.tool_call_list ?? []
-    const customerPhone = message.call?.customer?.number ?? body.call?.customer?.number ?? ''
+  // Vapi sends the message nested under body.message
+  const msg = (body.message ?? body) as Record<string, unknown>;
+  const toolCalls = (msg.toolCallList ?? []) as Array<{
+    id: string;
+    function: { name: string; arguments: string };
+  }>;
 
-    const results = []
+  const results: Array<{ toolCallId: string; result: string }> = [];
 
-    for (const toolCall of toolCallList) {
-      const toolCallId = toolCall.id ?? toolCall.toolCallId
-      const fn = toolCall.function ?? {}
-      const name = fn.name ?? ''
-      let args: Record<string, string> = {}
-      try {
-        args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : (fn.arguments ?? {})
-      } catch { /* ignore */ }
-
-      if (name === 'agendarCita') {
-        const { fecha, hora, servicio, mascota, propietario, notas } = args
-        const telefono = customerPhone || args.telefono || ''
-
-        const saved = await dbInsert('pc_citas', {
-          fecha: fecha ?? new Date().toISOString().slice(0, 10),
-          hora: hora ?? '',
-          mascota: mascota ?? '',
-          propietario: propietario ?? '',
-          telefono: telefono.replace(/\D/g, '').slice(-10),
-          servicio: servicio ?? 'consulta',
-          notas: notas ?? '',
-          estado: 'pendiente',
-          agendada_por: 'sofia',
-        })
-
-        if (saved) {
-          const fechaStr = fecha
-            ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long' })
-            : 'la fecha acordada'
-          results.push({
-            toolCallId,
-            result: `¡Perfecto! La cita para ${mascota || 'su mascota'} ha sido agendada exitosamente para el ${fechaStr} a las ${hora || 'la hora acordada'} para el servicio de ${servicio || 'consulta'}. ¡Los esperamos en PetColinas!`,
-          })
-        } else {
-          results.push({
-            toolCallId,
-            result: 'Hubo un problema al guardar la cita. Por favor llame directamente a PetColinas para confirmar.',
-          })
-        }
-
-      } else if (name === 'obtenerInfoCliente') {
-        const { nombreMascota, telefono } = args
-        const tel = (telefono || customerPhone).replace(/\D/g, '').slice(-10)
-
-        let rows = null
-        if (nombreMascota) {
-          rows = await dbQuery('pc_clientes', `?nombremascota=ilike.*${encodeURIComponent(nombreMascota)}*&limit=1`)
-        } else if (tel) {
-          rows = await dbQuery('pc_clientes', `?telefono=eq.${tel}&limit=1`)
-        }
-
-        const c = Array.isArray(rows) ? rows[0] : null
-        if (c) {
-          results.push({
-            toolCallId,
-            result: `Cliente encontrado: ${c.nombremascota || ''}, propietario ${c.nombrepropietario || ''}. Teléfono: ${c.telefono || ''}. Especie: ${c.especie || ''}. Raza: ${c.raza || ''}.`,
-          })
-        } else {
-          results.push({
-            toolCallId,
-            result: 'Cliente no encontrado en el sistema. Puede ser un cliente nuevo.',
-          })
-        }
-
-      } else {
-        results.push({ toolCallId, result: `Herramienta "${name}" no reconocida.` })
-      }
+  for (const call of toolCalls) {
+    let args: Record<string, unknown> = {};
+    try {
+      args = JSON.parse(call.function.arguments || "{}");
+    } catch {
+      /* ignore parse errors */
     }
 
-    return new Response(JSON.stringify({ results }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    const name = call.function.name;
 
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    if (name === "obtenerInfoCliente") {
+      const resultado = await handleObtenerInfoCliente(args);
+      results.push({ toolCallId: call.id, result: resultado });
+    } else if (name === "agendarCita") {
+      const resultado = await handleAgendarCita(args, msg);
+      results.push({ toolCallId: call.id, result: resultado });
+    } else {
+      results.push({ toolCallId: call.id, result: "Herramienta desconocida." });
+    }
   }
-})
+
+  return new Response(JSON.stringify({ results }), {
+    headers: { ...cors, "Content-Type": "application/json" },
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+async function handleObtenerInfoCliente(args: Record<string, unknown>): Promise<string> {
+  const nombreMascota = String(args.nombreMascota ?? "").toLowerCase().trim();
+  if (!nombreMascota) return "No se proporcionó nombre de mascota.";
+
+  // Buscar en CRM
+  const { data: clientes } = await supabase
+    .from("pc_clientes")
+    .select("*")
+    .ilike("nombreMascota", `%${nombreMascota}%`)
+    .limit(1);
+
+  const cliente = clientes?.[0];
+
+  // Última visita en ventas
+  const { data: ventas } = await supabase
+    .from("pc_ventas")
+    .select("fecha, area, servicio, total")
+    .ilike("cliente", `%${nombreMascota}%`)
+    .order("fecha", { ascending: false })
+    .limit(5);
+
+  // Seguimientos pendientes
+  const { data: seguimientos } = await supabase
+    .from("pc_seguimientos")
+    .select("fecha, descripcion, tipo")
+    .ilike("mascota", `%${nombreMascota}%`)
+    .order("fecha", { ascending: false })
+    .limit(3);
+
+  const info: string[] = [];
+
+  if (cliente) {
+    if (cliente.nombrePropietario) info.push(`Propietario: ${cliente.nombrePropietario}`);
+    if (cliente.especie) info.push(`Especie: ${cliente.especie}`);
+    if (cliente.raza) info.push(`Raza: ${cliente.raza}`);
+    if (cliente.edad) info.push(`Edad: ${cliente.edad}`);
+    if (cliente.telefono) info.push(`Teléfono: ${cliente.telefono}`);
+  }
+
+  if (ventas && ventas.length > 0) {
+    const ultima = ventas[0];
+    info.push(`Última visita: ${ultima.fecha} (${ultima.area} — ${ultima.servicio || ""} RD$${ultima.total || 0})`);
+  } else {
+    info.push("No se encontraron visitas anteriores.");
+  }
+
+  if (seguimientos && seguimientos.length > 0) {
+    const seg = seguimientos[0];
+    info.push(`Seguimiento pendiente: ${seg.descripcion ?? ""} (${seg.fecha})`);
+  }
+
+  return info.length > 0 ? info.join("\n") : "No se encontró información del cliente.";
+}
+
+// ---------------------------------------------------------------------------
+
+async function handleAgendarCita(
+  args: Record<string, unknown>,
+  msg: Record<string, unknown>,
+): Promise<string> {
+  const nombreMascota = String(args.nombreMascota ?? "").trim();
+  const fecha = String(args.fecha ?? "").trim(); // YYYY-MM-DD o descripción libre
+  const hora = String(args.hora ?? "").trim();
+  const motivo = String(args.motivo ?? "Cita agendada por agente de voz").trim();
+
+  if (!nombreMascota) return "Se necesita el nombre de la mascota para agendar.";
+
+  // Derivar propietario de los argumentos o de la info de la llamada
+  const nombrePropietario = String(
+    args.nombrePropietario ?? (msg as Record<string, unknown>)?.nombrePropietario ?? ""
+  ).trim();
+
+  // Fecha ISO: intentar parsear o dejar como nota
+  let fechaISO: string;
+  try {
+    const d = new Date(fecha);
+    fechaISO = isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
+  } catch {
+    fechaISO = new Date().toISOString().slice(0, 10);
+  }
+
+  const descripcion = hora
+    ? `${motivo} — ${hora}`
+    : motivo;
+
+  // Guardar en pc_citas para visualizacion en Dashboard
+  const callCustomer = (msg.call as Record<string, unknown>)?.customer as Record<string, unknown> ?? {};
+  const telefono = String(callCustomer.number ?? args.telefono ?? "").replace(/\D/g, "").slice(-10);
+  const servicio = String(args.servicio ?? motivo);
+
+  const { error: errorCita } = await supabase.from("pc_citas").insert({
+    fecha: fechaISO,
+    hora: hora || null,
+    mascota: nombreMascota,
+    propietario: nombrePropietario || null,
+    telefono: telefono || null,
+    servicio,
+    notas: motivo !== servicio ? motivo : null,
+    estado: "pendiente",
+    agendada_por: "sofia",
+  });
+
+  if (errorCita) {
+    console.error("Error guardando en pc_citas:", errorCita);
+    return "Hubo un problema al guardar la cita. Por favor registrarla manualmente.";
+  }
+
+  return `Cita agendada correctamente para ${nombreMascota} el ${fechaISO}${hora ? " a las " + hora : ""}. ¡Los esperamos en PetColinas!`;
+}
