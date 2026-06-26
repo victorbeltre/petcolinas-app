@@ -20,8 +20,6 @@ const VAPI_API_KEY = Deno.env.get("VAPI_API_KEY")!;
 const VAPI_ASSISTANT_ID = Deno.env.get("VAPI_ASSISTANT_ID")!;
 const VAPI_PHONE_NUMBER_ID = Deno.env.get("VAPI_PHONE_NUMBER_ID")!;
 
-const VAPI_TOOLS_URL = `${SUPABASE_URL}/functions/v1/vapi-tools`;
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 const cors = {
@@ -82,46 +80,10 @@ Deno.serve(async (req: Request) => {
 
   const firstMessage = firstMessageMap[motivo] ?? firstMessageMap.manual;
 
-  // Herramientas que el asistente puede usar durante la llamada
-  const tools = [
-    {
-      type: "function",
-      function: {
-        name: "obtenerInfoCliente",
-        description: "Obtiene el historial del cliente y su mascota desde PetColinas (visitas, seguimientos).",
-        parameters: {
-          type: "object",
-          properties: {
-            nombreMascota: { type: "string", description: "Nombre de la mascota" },
-          },
-          required: ["nombreMascota"],
-        },
-      },
-      server: { url: VAPI_TOOLS_URL },
-    },
-    {
-      type: "function",
-      function: {
-        name: "agendarCita",
-        description: "Agenda y guarda una cita para la mascota en el sistema de PetColinas. Llamar siempre que el propietario confirme una cita.",
-        parameters: {
-          type: "object",
-          properties: {
-            nombreMascota: { type: "string", description: "Nombre de la mascota" },
-            nombrePropietario: { type: "string", description: "Nombre del propietario" },
-            fecha: { type: "string", description: "Fecha de la cita, ej: '2026-06-26' o 'mañana'" },
-            hora: { type: "string", description: "Hora de la cita, ej: '2:00 PM' o '14:00'" },
-            servicio: { type: "string", description: "Tipo de servicio: grooming, veterinaria, baño medicado, etc." },
-            motivo: { type: "string", description: "Motivo adicional de la cita" },
-          },
-          required: ["nombreMascota", "fecha"],
-        },
-      },
-      server: { url: VAPI_TOOLS_URL },
-    },
-  ];
-
   // Llamar a Vapi API
+  // Nota: los tools (agendarCita, obtenerInfoCliente) deben estar configurados
+  // directamente en el asistente de Vapi (dashboard), no via assistantOverrides.model
+  // porque Vapi requiere provider completo al sobrescribir el modelo.
   const vapiPayload = {
     assistantId: VAPI_ASSISTANT_ID,
     phoneNumberId: VAPI_PHONE_NUMBER_ID,
@@ -137,7 +99,6 @@ Deno.serve(async (req: Request) => {
         motivo,
         contexto,
       },
-      model: { tools },
     },
     metadata: {
       nombreMascota,
