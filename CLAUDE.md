@@ -50,18 +50,28 @@ App de gestión para la clínica veterinaria PetColinas (República Dominicana).
 | `PetColinas` | 3066 | Componente raíz (maneja auth) |
 | `INVENTARIO_SEED` | ~3090 | Seed de inventario (35 productos) |
 | `PetColinasApp` | 3124 | App principal post-login, maneja tabs |
-| `Seguimientos` | 3440 | Módulo de seguimientos/recordatorios |
-| `ClientesInactivos` | 3759 | Vista de clientes sin visitas recientes |
-| `AlertaSeguimientos` | 3891 | Widget de alertas de seguimientos |
-| `AlertaClientesInactivos` | 3907 | Widget de clientes inactivos |
-| `Dashboard` | 3934 | KPIs, comisiones, gráficos mensuales |
-| `Ventas` | 4273 | Registro y gestión de ventas |
-| `InventarioAnalytics` | 4799 | Análisis de inventario |
-| `Inventario` | 4954 | Gestión de stock/productos |
-| `Nomina` | 5171 | Nómina de empleados |
-| `Gastos` | 5225 | Registro de gastos |
-| `Reportes` | 5310 | Reportes por período |
-| `CRM` | 5413 | Ficha de clientes/mascotas |
+| `Seguimientos` | 3514 | Módulo de seguimientos/recordatorios |
+| `ClientesInactivos` | 3833 | Vista de clientes sin visitas recientes |
+| `AlertaSeguimientos` | 3965 | Widget de alertas de seguimientos |
+| `AlertaClientesInactivos` | 3981 | Widget de clientes inactivos |
+| `Dashboard` | 4008 | KPIs, comisiones, gráficos mensuales |
+| `Ventas` | 4382 | Registro y gestión de ventas |
+| `InventarioAnalytics` | 4908 | Análisis de inventario |
+| `Inventario` | 5063 | Gestión de stock/productos |
+| `Nomina` | 5280 | Nómina de empleados |
+| `Gastos` | 5334 | Registro de gastos |
+| `Reportes` | 5419 | Reportes por período |
+| PetIA (motor) | 5495 | `IA_SEGMENTOS`, `iaPerfilCliente`, `iaOportunidades` + helpers `_e`, `IAChip`, `WABtn` |
+| `CRM` | 5725 | CRM 360°: lista con asistente PetIA, ficha con tabs (Resumen IA, Historial, Salud, Seguimientos, Bitácora, Galería) |
+
+### PetIA (inteligencia local del CRM)
+
+- Todo el análisis corre en el navegador, sin llamadas externas ni API keys.
+- `iaPerfilCliente(cliente, ventas)` calcula por cliente: segmento (VIP/Leal/Prometedor/Nuevo/En riesgo/Dormido/Sin visitas), score 0-100, riesgo de abandono (%), frecuencia de visita aprendida, próxima visita estimada, consumo por área (grooming/vet/pet shop), lealtad (10.º baño gratis), alertas de salud (vacunas vencidas, antipulgas, esterilización) y recomendaciones cross-sell.
+- `iaOportunidades(...)` genera la lista de acciones del día (seguimientos vencidos, vacunas, cumpleaños, reactivaciones) con links de WhatsApp prellenados.
+- Mensajes de WhatsApp personalizados por plantilla (`perfil.wa.plantillas`, sugerida en `perfil.wa.sugerida`).
+- Bitácora de contactos por cliente en `localStorage` (`pc_crm_bitacora`) — no está en Supabase, igual que facturas.
+- Fechas: el motor solo acepta fechas `YYYY-MM-DD` válidas (`iaFechaValida`) — hay ventas con fechas malformadas en el seed.
 
 ---
 
