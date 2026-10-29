@@ -1,0 +1,64 @@
+feature,area,priority,original,clone,notes
+Alta de empresa con RNC y datos fiscales,empresa,must,yes,no,S02
+Subir certificado .p12 con clave y ver vencimiento,certificado,must,yes,no,S03; la clave nunca va al navegador
+Aviso de certificado por vencer o vencido,certificado,must,yes,no,S06 S03
+Asistente de certificacion DGII con set de pruebas en TesteCF/CerteCF,certificacion,must,partial,no,S04; Alegra acompaña el proceso; aqui se corre el set
+Cambio de ambiente TesteCF / CerteCF / eCF,certificacion,must,yes,no,
+Rangos e-NCF por tipo con vencimiento y contador,numeracion,must,yes,no,S05; formato E + tipo + 10 digitos
+Aviso de rango por agotarse o vencido,numeracion,must,yes,no,S06
+Autenticacion DGII por semilla firmada y token con renovacion,dgii,must,dgii,no,servicio de autenticacion
+XML por tipo segun XSD de la DGII (no UBL),dgii,must,yes,no,validar contra el XSD antes de firmar
+Firma XMLDSig enveloped con el certificado de la empresa,dgii,must,yes,no,sin preservar espacios; no tocar despues de firmar
+Envio a Recepcion e-CF y guardado del TrackId,dgii,must,yes,no,
+Consulta de estado por TrackId (Aceptado / Condicional / Rechazado / En Proceso),dgii,must,yes,no,S09
+Resumen RFCE para E32 menor de RD$250000,dgii,must,yes,no,RecepcionFC
+E32 de RD$250000 o mas como e-CF completo con identificacion del comprador,dgii,must,yes,no,
+Emitir E31 credito fiscal,ventas,must,yes,no,F02
+Emitir E32 consumo,ventas,must,yes,no,F03
+Tipo sugerido segun cliente (RNC -> 31; sin RNC -> 32),ventas,must,yes,no,S08
+Lineas con descuento e ITBIS 18/16/exento,ventas,must,yes,no,reusar calcularCotizacion
+Retenciones ISR e ITBIS en el documento,ventas,must,yes,no,
+Emitir E34 nota de credito con codigo de modificacion,ventas,must,yes,no,F04; unica forma de anular lo ya enviado
+Emitir E33 nota de debito,ventas,must,yes,no,F05
+Emitir E41 comprobante de compras,compras,must,yes,no,F07
+Emitir E43 gastos menores,compras,must,yes,no,F08
+Representacion impresa PDF con QR y codigo de seguridad,impresion,must,yes,no,S10; confirmar formato del QR en la v1.6
+Ticket 80 mm para E32,impresion,should,yes,no,
+Detalle del e-CF con linea de tiempo y mensajes de la DGII,ventas,must,yes,no,S09
+Descargar el XML firmado,ventas,must,yes,no,
+URL de recepcion publica que responde ARECF firmado,receptor,must,dgii,no,obligatorio para todo emisor electronico
+URL de aprobacion comercial y autenticacion del receptor,receptor,must,dgii,no,
+Bandeja de e-CF recibidos con aceptar / rechazar (ACECF),receptor,must,yes,no,S16
+Pasar un e-CF recibido a compras (606),compras,must,yes,no,S16 -> S15
+Registro de facturas de proveedor serie B y E con tipo 01-11,compras,must,yes,no,S15
+Reporte 606 con validacion por fila y TXT de la DGII,reportes,must,yes,no,S20; 606 en cero si no hubo compras
+Cola de envios con reintentos y bitacora,dgii,must,partial,no,S23
+Contingencia: emitir firmado sin DGII y enviar despues,dgii,should,yes,no,confirmar reglas de contingencia en la descripcion tecnica
+Reporte 607 de ventas serie B,reportes,should,yes,no,S21; un emisor 100% electronico no lo presenta
+Ayuda para casillas del Anexo A del IT-1,reportes,should,partial,no,S22; verificar casillas con el contador
+Consulta de directorio DGII por RNC del cliente,contactos,should,yes,no,
+Validar RNC/cedula del contacto,contactos,should,yes,no,
+Pagos recibidos y saldo por cobrar,cobros,should,yes,no,S13
+Enviar la factura por WhatsApp o correo,ventas,should,yes,no,wa.me como el resto de PetColinas
+Catalogo de productos con indicador bien/servicio,inventario,should,yes,no,S19
+Impuestos y retenciones configurables,configuracion,should,yes,no,S24
+Usuarios y roles (admin / facturador / contador),configuracion,should,yes,no,S25
+Plantilla de factura con logo y colores,configuracion,should,yes,no,S26
+Anulacion de rangos firmados no enviados (ANECF),dgii,should,yes,no,
+Inicio con ventas / por cobrar / alertas DGII,inicio,should,yes,no,S06
+Exportar listas a Excel,reportes,should,yes,no,
+Emitir E45 gubernamental,ventas,could,yes,no,obligatorio para venderle al Estado
+Emitir E44 regimenes especiales,ventas,could,yes,no,
+Emitir E46 exportaciones,ventas,could,yes,no,
+Emitir E47 pagos al exterior,compras,could,yes,no,
+Reporte 608 (comprobantes anulados serie B),reportes,could,yes,no,
+Facturas recurrentes,ventas,could,yes,no,
+Cotizacion -> factura e-CF,ventas,could,yes,no,PetColinas ya tiene Cotizaciones (M25)
+Varias empresas por cuenta (multi-RNC),producto,could,yes,no,necesario solo para vender PetFinanzas
+Pantalla de pre-validacion igual a la herramienta de la DGII,reportes,could,dgii,no,
+Presentar 606/607 directo en la Oficina Virtual,reportes,skip,no,skip,la DGII no tiene API publica para esto; se sube el TXT a mano
+Declarar el IT-1,reportes,skip,no,skip,se hace en la Oficina Virtual
+Emitir el certificado digital,certificado,skip,no,skip,lo emite una entidad autorizada por INDOTEL
+Usar la certificacion o autorizacion de Alegra,regulatorio,skip,yes,skip,cada emisor se certifica; vender exige autorizacion propia como proveedor
+Contabilidad completa de Alegra (cuentas / asientos / conciliacion),contabilidad,skip,yes,skip,fuera del alcance pedido
+Marca / textos / iconos de Alegra,marca,skip,yes,skip,solo patrones de uso
